@@ -1,6 +1,7 @@
 # vertual environment
 venv/
 .venv/
+.env
 
 # data
 data/
