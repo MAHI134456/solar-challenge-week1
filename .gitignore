@@ -1,0 +1,10 @@
+# vertual environment
+venv/
+.venv/
+
+# data
+data/
+*.csv
+
+# notebook
+.ipynb_checkpoints/
