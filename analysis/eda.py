@@ -27,6 +27,12 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     outliers= (z_scores.abs()> 3).any(axis=1)
     print(f"\nOutliers (|z|>3) for {country}: {outliers.sum()} rows")
 
+    for col in numeric_cols:
+        lower = df[col].quantile(0.01)
+        upper = df[col].quantile(0.99)
+        df[col] = df[col].clip(lower, upper)
+    print(f"Outliers capped at 1st and 99th percentiles for {country}.")
+
     # Impute missing values with median for key columns
     for col in numeric_cols:
         df[col]=df[col].fillna(df[col].median())
