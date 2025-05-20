@@ -2,35 +2,39 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
-from windrose import WindroseAxes
 import numpy as np
 
-# this next function would be a function that performs EDA for all the three branches when called
 def perform_eda(csv_file, country, output_dir='scripts'):
-    
-    # loading the data
-    df= pd.read_csv(csv_file)
-    df['Timestamp']= pd.to_datetime(df['Timestamp'])
+    # Loading the data
+    df = pd.read_csv(csv_file)
+    df['Timestamp'] = pd.to_datetime(df['Timestamp'])
 
-    # summary statistics and missing values
+    # Summary statistics and missing values
     print(f"\nSummary statistics for {country}:")
     print(df.describe())
     print(f"\nMissing value for {country}:")
-    missing= df.isnull().sum()
+    missing = df.isnull().sum()
     print(missing)
-    missing_pct= ((missing/len(df)) *100)
+    missing_pct = ((missing / len(df)) * 100)
     print(f"\nColumns with >5% missing values:")
     print(missing_pct[missing_pct > 5])
 
     # Outlier detection and cleaning
-    numeric_cols= ['GHI', 'DNI', 'DHI', 'ModA', 'ModB', 'WS', 'WSgust']
-    z_scores= df[numeric_cols].apply(stats.zscore)
-    outliers= (z_scores.abs()> 3).any(axis=1)
+    numeric_cols = ['GHI', 'DNI', 'DHI', 'ModA', 'ModB', 'WS', 'WSgust']
+    z_scores = df[numeric_cols].apply(stats.zscore)
+    outliers = (z_scores.abs() > 3).any(axis=1)
     print(f"\nOutliers (|z|>3) for {country}: {outliers.sum()} rows")
+
+    # Outlier capping (winsorizing)
+    for col in numeric_cols:
+        lower = df[col].quantile(0.01)
+        upper = df[col].quantile(0.99)
+        df[col] = df[col].clip(lower, upper)
+    print(f"Outliers capped at 1st and 99th percentiles for {country}.")
 
     # Impute missing values with median for key columns
     for col in numeric_cols:
-        df[col]=df[col].fillna(df[col].median())
+        df[col] = df[col].fillna(df[col].median())
     
     # Export cleaned data
     cleaned_csv = f'data/{country}_clean.csv'
@@ -38,7 +42,6 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     print(f"Cleaned data saved to {cleaned_csv}")
 
     # Time series analysis
-    # line chart with anomalies
     z_scores_ghi = stats.zscore(df['GHI'], nan_policy='omit')
     anomalies = df[z_scores_ghi.abs() > 3]
     fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -65,7 +68,7 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     plt.show()
     print(f"\nGHI Anomalies (|Z|>3) for {country}: {len(anomalies)} rows")
 
-    # bar chart of monthly pattern 
+    # Bar chart of monthly pattern 
     df['Month'] = df['Timestamp'].dt.month
     monthly_avg = df.groupby('Month')[['GHI', 'DNI', 'DHI', 'Tamb']].mean()
     monthly_avg.plot(kind='bar', figsize=(12, 6))
@@ -79,8 +82,8 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     plt.show()
     print(f"\nMonthly Averages for {country}:")
     print(monthly_avg)
-     
-    # daily trends 
+    
+    # Daily trends 
     df['Hour'] = df['Timestamp'].dt.hour
     hourly_avg = df.groupby('Hour')[['GHI', 'DNI', 'DHI']].mean()
     hourly_avg.plot(kind='line', figsize=(12, 6))
@@ -95,7 +98,7 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     print(f"\nHourly Averages for {country}:")
     print(hourly_avg)
 
-    ## cleaning Impact
+    # Cleaning Impact
     cleaning_impact = df.groupby('Cleaning')[['ModA', 'ModB']].mean()
     print(f"\nCleaning Impact for {country}:")
     print(cleaning_impact)
@@ -106,7 +109,7 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     plt.savefig(cleaning_plot)
     plt.show()
 
-    # correlation Analysis
+    # Correlation Analysis
     corr_cols = ['GHI', 'DNI', 'DHI', 'TModA', 'TModB']
     plt.figure(figsize=(8, 6))
     sns.heatmap(df[corr_cols].corr(), annot=True, cmap='coolwarm')
@@ -139,25 +142,38 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     plt.show()
 
     # Wind Analysis
-    fig = plt.figure(figsize=(8, 8))
-    ax = WindroseAxes.from_ax(fig=fig)
-    ax.bar(df['WD'], df['WS'], normed=True, opening=0.8, edgecolor='white')
-    ax.set_title(f'Wind Rose ({country})')
-    wind_plot = f'{output_dir}/{country}_windrose.png'
+    # Radial bar plot for wind speed and direction
+    bins = np.arange(0, 360 + 45, 45)
+    labels = [f'{int(b)}-{int(b+45)}' for b in bins[:-1]]
+    wd_binned = pd.cut(df['WD'], bins=bins, labels=labels, include_lowest=True)
+    ws_mean = df['WS'].groupby(wd_binned).mean()
+    angles = np.linspace(0, 2 * np.pi, len(ws_mean), endpoint=False)
+    widths = np.pi / 4  # 45 degrees per bar
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+    ax.bar(angles, ws_mean, width=widths, edgecolor='white', alpha=0.7)
+    ax.set_xticks(angles)
+    ax.set_xticklabels(ws_mean.index)
+    ax.set_title(f'Wind Direction and Speed ({country})')
+    wind_plot = f'{output_dir}/{country}_wind_radial.png'
     plt.savefig(wind_plot)
     plt.show()
 
     # Histogram
     plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
+    plt.subplot(1, 3, 1)
     plt.hist(df['GHI'], bins=20)
     plt.title(f'GHI Distribution ({country})')
     plt.xlabel('GHI (W/m²)')
     
-    plt.subplot(1, 2, 2)
+    plt.subplot(1, 3, 2)
     plt.hist(df['WS'], bins=20)
     plt.title(f'Wind Speed Distribution ({country})')
     plt.xlabel('Wind Speed (m/s)')
+
+    plt.subplot(1, 3, 3)
+    plt.hist(df['RH'], bins=20)
+    plt.title(f'Relative Humidity Distribution ({country})')
+    plt.xlabel('Relative Humidity (%)')
     plt.tight_layout()
     hist_plot = f'{output_dir}/{country}_hist.png'
     plt.savefig(hist_plot)

@@ -1,7 +1,7 @@
 # HOW TO REPRODUCE THE ENVIRONMENT
 
 ## prerequists
-  - python 3.23.3
+  - python 3.13.3
   - git
   - github account
 
