@@ -2,7 +2,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
-from windrose import WindroseAxes
 import numpy as np
 
 # this next function would be a function that performs EDA for all the three branches when called
@@ -138,12 +137,19 @@ def perform_eda(csv_file, country, output_dir='scripts'):
     plt.savefig(scatter_plot)
     plt.show()
 
-    # Wind Analysis
-    fig = plt.figure(figsize=(8, 8))
-    ax = WindroseAxes.from_ax(fig=fig)
-    ax.bar(df['WD'], df['WS'], normed=True, opening=0.8, edgecolor='white')
-    ax.set_title(f'Wind Rose ({country})')
-    wind_plot = f'{output_dir}/{country}_windrose.png'
+   # Wind Analysis (polar bar plot)
+    bins = np.arange(0, 360 + 45, 45)
+    labels = [f'{int(b)}-{int(b+45)}' for b in bins[:-1]]
+    wd_binned = pd.cut(df['WD'], bins=bins, labels=labels, include_lowest=True)
+    ws_mean = df['WS'].groupby(wd_binned).mean()
+    angles = np.linspace(0, 2 * np.pi, len(ws_mean), endpoint=False)
+    widths = np.pi / 4  # 45 degrees per bar
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+    ax.bar(angles, ws_mean, width=widths, edgecolor='white', alpha=0.7)
+    ax.set_xticks(angles)
+    ax.set_xticklabels(ws_mean.index)
+    ax.set_title(f'Wind Direction and Speed ({country})')
+    wind_plot = f'{output_dir}/{country}_wind_radial.png'
     plt.savefig(wind_plot)
     plt.show()
 
