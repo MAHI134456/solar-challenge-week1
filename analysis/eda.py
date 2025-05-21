@@ -4,7 +4,7 @@ from scipy import stats
 import seaborn as sns
 import numpy as np
 
-def perform_eda(csv_file, country, output_dir= output_dir):
+def perform_eda(csv_file, country, output_dir='scripts'):
     # Loading the data
     df = pd.read_csv(csv_file)
     df['Timestamp'] = pd.to_datetime(df['Timestamp'])
@@ -25,9 +25,21 @@ def perform_eda(csv_file, country, output_dir= output_dir):
     outliers = (z_scores.abs() > 3).any(axis=1)
     print(f"\nOutliers (|z|>3) for {country}: {outliers.sum()} rows")
 
+    # Outlier capping (winsorizing)
+    for col in numeric_cols:
+        lower = df[col].quantile(0.01)
+        upper = df[col].quantile(0.99)
+        df[col] = df[col].clip(lower, upper)
+    print(f"Outliers capped at 1st and 99th percentiles for {country}.")
+
     # Impute missing values with median for key columns
     for col in numeric_cols:
         df[col] = df[col].fillna(df[col].median())
+
+    irradiance_cols = ['GHI', 'DNI', 'DHI']
+    for col in irradiance_cols:
+      if col in df.columns:
+        df[col] = df[col].clip(lower=0)
     
     # Export cleaned data
     cleaned_csv = f'data/{country}_clean.csv'
