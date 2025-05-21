@@ -28,6 +28,11 @@ def perform_eda(csv_file, country, output_dir= output_dir):
     # Impute missing values with median for key columns
     for col in numeric_cols:
         df[col] = df[col].fillna(df[col].median())
+
+    irradiance_cols = ['GHI', 'DNI', 'DHI']
+    for col in irradiance_cols:
+      if col in df.columns:
+        df[col] = df[col].clip(lower=0)
     
     # Export cleaned data
     cleaned_csv = f'data/{country}_clean.csv'
