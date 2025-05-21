@@ -9,3 +9,4 @@ data/
 
 # notebook
 .ipynb_checkpoints/
+.venv_task4/
